@@ -182,15 +182,22 @@
                 placeholder="Search expenses, tags, notes..."
                 aria-label="Search expenses"
               />
-              <div class="filter-pills" role="tablist" aria-label="Filter entries">
-                <button type="button" class="filter-pill active" data-filter="all">All</button>
-                <button type="button" class="filter-pill" data-filter="expense">Expenses</button>
-                <button type="button" class="filter-pill" data-filter="settlement">Paybacks</button>
+              <div class="filter-row">
+                <div class="filter-pills" role="tablist" aria-label="Filter entries">
+                  <button type="button" class="filter-pill active" data-filter="all">All</button>
+                  <button type="button" class="filter-pill" data-filter="expense">Expenses</button>
+                  <button type="button" class="filter-pill" data-filter="settlement">Paybacks</button>
+                </div>
+                <select id="tag-filter-select" class="tag-filter-select" aria-label="Filter by tag">
+                  <option value="">All tags</option>
+                </select>
               </div>
             </div>
 
-            <div id="tag-filter-bar" class="tag-filter-bar hidden" aria-label="Filter by tag"></div>
-            <div id="tag-filter-summary" class="tag-filter-summary hidden"></div>
+            <div id="tag-filter-summary" class="tag-filter-summary hidden">
+              <span id="tag-filter-summary-text"></span>
+              <button type="button" id="tag-filter-clear" class="link-btn">Clear</button>
+            </div>
 
             <div id="feed-container" class="feed-container"></div>
           </section>

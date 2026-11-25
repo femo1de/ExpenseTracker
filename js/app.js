@@ -355,59 +355,48 @@ function renderDashboard() {
     breakdownWrap.classList.add("hidden");
   }
 
-  renderTagFilterBar();
+  renderTagFilterSelect();
   renderFeed();
 }
 
-function renderTagFilterBar() {
-  const bar = el("tag-filter-bar");
+function renderTagFilterSelect() {
+  const select = el("tag-filter-select");
   const allTags = getAllTags(state.ledger.entries);
 
-  if (
-    state.selectedTag &&
-    !allTags.some((t) => t.toLowerCase() === state.selectedTag.toLowerCase())
-  ) {
-    state.selectedTag = "";
-  }
+  const matchedTag = state.selectedTag
+    ? allTags.find((t) => t.toLowerCase() === state.selectedTag.toLowerCase()) || ""
+    : "";
+  state.selectedTag = matchedTag;
+
+  select.innerHTML = "";
+  const allOpt = document.createElement("option");
+  allOpt.value = "";
+  allOpt.textContent = "All tags";
+  select.appendChild(allOpt);
 
   if (allTags.length === 0) {
-    bar.classList.add("hidden");
-    bar.innerHTML = "";
-    return;
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.disabled = true;
+    noneOpt.textContent = "No tags yet";
+    select.appendChild(noneOpt);
+  } else {
+    for (const tag of allTags) {
+      const opt = document.createElement("option");
+      opt.value = tag;
+      opt.textContent = `#${tag}`;
+      select.appendChild(opt);
+    }
   }
 
-  bar.classList.remove("hidden");
-  bar.innerHTML = "";
-
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = `tag-filter-pill${state.selectedTag === "" ? " active" : ""}`;
-  allBtn.textContent = "All tags";
-  allBtn.addEventListener("click", () => {
-    state.selectedTag = "";
-    renderTagFilterBar();
-    renderFeed();
-  });
-  bar.appendChild(allBtn);
-
-  for (const tag of allTags) {
-    const isActive = state.selectedTag.toLowerCase() === tag.toLowerCase();
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `tag-filter-pill${isActive ? " active" : ""}`;
-    btn.textContent = `#${tag}`;
-    btn.addEventListener("click", () => {
-      state.selectedTag = isActive ? "" : tag;
-      renderTagFilterBar();
-      renderFeed();
-    });
-    bar.appendChild(btn);
-  }
+  select.value = state.selectedTag;
+  select.classList.toggle("active", Boolean(state.selectedTag));
 }
 
 function renderFeed() {
   const container = el("feed-container");
   const summaryEl = el("tag-filter-summary");
+  const summaryTextEl = el("tag-filter-summary-text");
   const query = state.search.trim().toLowerCase();
   const activeTagKey = state.selectedTag.toLowerCase();
   const sorted = sortEntriesNewestFirst(state.ledger.entries);
@@ -439,9 +428,9 @@ function renderFeed() {
       tagExpenses.reduce((sum, e) => sum + (Number(e.amountHome) || 0), 0),
       homeCurrency
     );
-    summaryEl.textContent = `#${state.selectedTag} · ${tagExpenses.length} expense${
+    summaryTextEl.textContent = `#${state.selectedTag} · ${tagExpenses.length} expense${
       tagExpenses.length === 1 ? "" : "s"
-    } · ${formatMoney(tagTotalHome, homeCurrency)} total`;
+    } · ${formatMoney(tagTotalHome, homeCurrency)}`;
     summaryEl.classList.remove("hidden");
   } else {
     summaryEl.classList.add("hidden");
@@ -1120,6 +1109,18 @@ function wireEvents() {
       renderFeed();
     });
   }
+
+  el("tag-filter-select").addEventListener("change", (e) => {
+    state.selectedTag = e.target.value;
+    el("tag-filter-select").classList.toggle("active", Boolean(state.selectedTag));
+    renderFeed();
+  });
+
+  el("tag-filter-clear").addEventListener("click", () => {
+    state.selectedTag = "";
+    renderTagFilterSelect();
+    renderFeed();
+  });
 
   // Modal close handlers
   for (const closeBtn of document.querySelectorAll("[data-close-modal]")) {
