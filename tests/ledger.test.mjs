@@ -7,6 +7,8 @@ import {
   createSettlementEntry,
   calculateBalances,
   getEntryImpactForUser,
+  getAllTags,
+  normalizeTags,
   upsertEntry,
   deleteEntry,
   createEmptyLedger,
@@ -170,4 +172,47 @@ test("upsertEntry and deleteEntry mutate ledger immutably", () => {
 
   const removed = deleteEntry(updated, exp.id);
   assert.equal(removed.entries.length, 0);
+});
+
+test("normalizeTags and getAllTags support multiple tags with deduplication and backwards compatibility", () => {
+  assert.deepEqual(normalizeTags(" #Japan 2026 , Food, japan 2026 , , Hotel "), [
+    "Japan 2026",
+    "Food",
+    "Hotel",
+  ]);
+  assert.deepEqual(normalizeTags(undefined), []);
+
+  const exp1 = createExpenseEntry(
+    {
+      title: "Sushi",
+      date: "2026-11-25",
+      amount: 50,
+      currency: "SGD",
+      fxRate: 1,
+      paidBy: "partnerA",
+      splitMode: "even",
+      tags: "Japan 2026, Food",
+    },
+    USERS,
+    "SGD"
+  );
+  const exp2 = createExpenseEntry(
+    {
+      title: "Hotel",
+      date: "2026-11-26",
+      amount: 200,
+      currency: "SGD",
+      fxRate: 1,
+      paidBy: "partnerB",
+      splitMode: "even",
+      tags: ["japan 2026", "Accommodation"],
+    },
+    USERS,
+    "SGD"
+  );
+  const legacyEntry = { id: "exp_old", type: "expense", title: "Old" };
+
+  assert.deepEqual(exp1.tags, ["Japan 2026", "Food"]);
+  assert.deepEqual(exp2.tags, ["japan 2026", "Accommodation"]);
+  assert.deepEqual(getAllTags([exp1, exp2, legacyEntry]), ["Accommodation", "Food", "Japan 2026"]);
 });

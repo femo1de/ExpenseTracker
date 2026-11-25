@@ -179,7 +179,7 @@
                 id="search-input"
                 type="search"
                 class="search-input"
-                placeholder="Search expenses, notes, currency..."
+                placeholder="Search expenses, tags, notes..."
                 aria-label="Search expenses"
               />
               <div class="filter-pills" role="tablist" aria-label="Filter entries">
@@ -188,6 +188,9 @@
                 <button type="button" class="filter-pill" data-filter="settlement">Paybacks</button>
               </div>
             </div>
+
+            <div id="tag-filter-bar" class="tag-filter-bar hidden" aria-label="Filter by tag"></div>
+            <div id="tag-filter-summary" class="tag-filter-summary hidden"></div>
 
             <div id="feed-container" class="feed-container"></div>
           </section>
@@ -288,6 +291,12 @@
               </div>
             </div>
             <small id="exp-split-status" class="field-hint"></small>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="exp-tags">Tags (optional, comma-separated)</label>
+            <input id="exp-tags" type="text" placeholder="e.g., Japan 2026, Food" maxlength="160" />
+            <div id="exp-tag-suggestions" class="quick-chips hidden"></div>
           </div>
 
           <div class="field-group">

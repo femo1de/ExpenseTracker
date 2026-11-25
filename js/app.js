@@ -7,8 +7,10 @@ import {
   createExpenseEntry,
   createSettlementEntry,
   deleteEntry,
+  getAllTags,
   getCurrencyDecimals,
   getEntryImpactForUser,
+  normalizeTags,
   roundCurrency,
   sortEntriesNewestFirst,
   upsertEntry,
@@ -30,6 +32,7 @@ const state = {
   storage: null,
   ledger: createEmptyLedger(homeCurrency),
   filter: "all",
+  selectedTag: "",
   search: "",
   breakdownExpanded: true,
   isSaving: false,
@@ -352,22 +355,76 @@ function renderDashboard() {
     breakdownWrap.classList.add("hidden");
   }
 
+  renderTagFilterBar();
   renderFeed();
+}
+
+function renderTagFilterBar() {
+  const bar = el("tag-filter-bar");
+  const allTags = getAllTags(state.ledger.entries);
+
+  if (
+    state.selectedTag &&
+    !allTags.some((t) => t.toLowerCase() === state.selectedTag.toLowerCase())
+  ) {
+    state.selectedTag = "";
+  }
+
+  if (allTags.length === 0) {
+    bar.classList.add("hidden");
+    bar.innerHTML = "";
+    return;
+  }
+
+  bar.classList.remove("hidden");
+  bar.innerHTML = "";
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `tag-filter-pill${state.selectedTag === "" ? " active" : ""}`;
+  allBtn.textContent = "All tags";
+  allBtn.addEventListener("click", () => {
+    state.selectedTag = "";
+    renderTagFilterBar();
+    renderFeed();
+  });
+  bar.appendChild(allBtn);
+
+  for (const tag of allTags) {
+    const isActive = state.selectedTag.toLowerCase() === tag.toLowerCase();
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `tag-filter-pill${isActive ? " active" : ""}`;
+    btn.textContent = `#${tag}`;
+    btn.addEventListener("click", () => {
+      state.selectedTag = isActive ? "" : tag;
+      renderTagFilterBar();
+      renderFeed();
+    });
+    bar.appendChild(btn);
+  }
 }
 
 function renderFeed() {
   const container = el("feed-container");
+  const summaryEl = el("tag-filter-summary");
   const query = state.search.trim().toLowerCase();
+  const activeTagKey = state.selectedTag.toLowerCase();
   const sorted = sortEntriesNewestFirst(state.ledger.entries);
 
   const filtered = sorted.filter((entry) => {
     if (state.filter !== "all" && entry.type !== state.filter) return false;
+    const entryTags = normalizeTags(entry.tags);
+    if (activeTagKey && !entryTags.some((t) => t.toLowerCase() === activeTagKey)) {
+      return false;
+    }
     if (!query) return true;
     const haystack = [
       entry.title,
       entry.notes,
       entry.currency,
       entry.date,
+      entryTags.join(" "),
       getUserName(entry.paidBy),
       entry.paidTo ? getUserName(entry.paidTo) : "",
     ]
@@ -375,6 +432,20 @@ function renderFeed() {
       .toLowerCase();
     return haystack.includes(query);
   });
+
+  if (state.selectedTag) {
+    const tagExpenses = filtered.filter((e) => e.type === "expense");
+    const tagTotalHome = roundCurrency(
+      tagExpenses.reduce((sum, e) => sum + (Number(e.amountHome) || 0), 0),
+      homeCurrency
+    );
+    summaryEl.textContent = `#${state.selectedTag} · ${tagExpenses.length} expense${
+      tagExpenses.length === 1 ? "" : "s"
+    } · ${formatMoney(tagTotalHome, homeCurrency)} total`;
+    summaryEl.classList.remove("hidden");
+  } else {
+    summaryEl.classList.add("hidden");
+  }
 
   container.innerHTML = "";
 
@@ -455,6 +526,19 @@ function buildEntryCard(entry) {
   }
 
   main.append(title, meta);
+
+  const entryTags = normalizeTags(entry.tags);
+  if (entryTags.length > 0) {
+    const tagsRow = document.createElement("div");
+    tagsRow.className = "entry-tags";
+    for (const tag of entryTags) {
+      const pill = document.createElement("span");
+      pill.className = "entry-tag";
+      pill.textContent = `#${tag}`;
+      tagsRow.appendChild(pill);
+    }
+    main.appendChild(tagsRow);
+  }
 
   const amounts = document.createElement("div");
   amounts.className = "entry-amounts";
@@ -632,6 +716,42 @@ function updateExpenseSplitUI() {
   }
 }
 
+function renderExpenseTagSuggestions() {
+  const container = el("exp-tag-suggestions");
+  const allTags = getAllTags(state.ledger.entries);
+  if (allTags.length === 0) {
+    container.classList.add("hidden");
+    container.innerHTML = "";
+    return;
+  }
+
+  const currentTags = normalizeTags(el("exp-tags").value);
+  const currentKeys = new Set(currentTags.map((t) => t.toLowerCase()));
+
+  container.classList.remove("hidden");
+  container.innerHTML = "";
+
+  for (const tag of allTags) {
+    const isSelected = currentKeys.has(tag.toLowerCase());
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `chip-btn${isSelected ? " active" : ""}`;
+    chip.textContent = `#${tag}`;
+    chip.addEventListener("click", () => {
+      const tags = normalizeTags(el("exp-tags").value);
+      const idx = tags.findIndex((t) => t.toLowerCase() === tag.toLowerCase());
+      if (idx >= 0) {
+        tags.splice(idx, 1);
+      } else {
+        tags.push(tag);
+      }
+      el("exp-tags").value = tags.join(", ");
+      renderExpenseTagSuggestions();
+    });
+    container.appendChild(chip);
+  }
+}
+
 function openExpenseModal(entry = null) {
   state.pendingDeleteId = null;
   el("exp-error").classList.add("hidden");
@@ -652,6 +772,7 @@ function openExpenseModal(entry = null) {
     el("exp-amount").value = String(entry.amount);
     el("exp-fx-rate").value = String(entry.fxRate || 1);
     el("exp-date").value = entry.date || todayIsoDate();
+    el("exp-tags").value = normalizeTags(entry.tags).join(", ");
     el("exp-notes").value = entry.notes || "";
     state.expPaidBy = entry.paidBy;
     el("exp-delete-btn").classList.remove("hidden");
@@ -667,6 +788,7 @@ function openExpenseModal(entry = null) {
     el("exp-amount").value = "";
     el("exp-fx-rate").value = "";
     el("exp-date").value = todayIsoDate();
+    el("exp-tags").value = state.selectedTag || "";
     el("exp-notes").value = "";
     el("exp-split-a").value = "";
     el("exp-split-b").value = "";
@@ -677,6 +799,7 @@ function openExpenseModal(entry = null) {
     handleModalCurrencyChange("exp", false);
   }
 
+  renderExpenseTagSuggestions();
   el("expense-modal").classList.remove("hidden");
   setTimeout(() => el("exp-title").focus(), 40);
 }
@@ -810,6 +933,7 @@ async function handleExpenseSubmit(event) {
                 [userIds[1]]: el("exp-split-b").value,
               }
             : null,
+        tags: el("exp-tags").value,
         notes: el("exp-notes").value,
         createdBy: state.currentUser.id,
       },
@@ -1074,6 +1198,7 @@ function wireEvents() {
     });
   }
 
+  el("exp-tags").addEventListener("input", () => renderExpenseTagSuggestions());
   el("expense-form").addEventListener("submit", handleExpenseSubmit);
   el("exp-delete-btn").addEventListener("click", () =>
     handleDeleteClick("expense-modal", "exp-id", "exp-delete-btn")

@@ -174,6 +174,44 @@ function validateCommonFields({ amount, currency, fxRate, date, paidBy }, userId
   };
 }
 
+export function normalizeTags(input) {
+  const rawList = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(",")
+      : [];
+
+  const seen = new Set();
+  const tags = [];
+  for (const item of rawList) {
+    const cleaned = String(item || "")
+      .trim()
+      .replace(/^#+/, "")
+      .replace(/\s+/g, " ")
+      .slice(0, 40)
+      .trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(cleaned);
+  }
+  return tags;
+}
+
+export function getAllTags(entries) {
+  const byKey = new Map();
+  for (const entry of entries || []) {
+    for (const tag of normalizeTags(entry?.tags)) {
+      const key = tag.toLowerCase();
+      if (!byKey.has(key)) {
+        byKey.set(key, tag);
+      }
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
 export function createExpenseEntry(input, userIds, homeCurrency, existingEntry = null) {
   const title = String(input.title || "").trim();
   if (!title) {
@@ -200,6 +238,7 @@ export function createExpenseEntry(input, userIds, homeCurrency, existingEntry =
           userIds
         );
 
+  const tags = normalizeTags(input.tags);
   const now = new Date().toISOString();
   return {
     id: existingEntry?.id || generateId("exp", common.date),
@@ -214,6 +253,7 @@ export function createExpenseEntry(input, userIds, homeCurrency, existingEntry =
     splitMode,
     splits,
     splitsHome,
+    tags,
     notes: String(input.notes || "").trim(),
     createdBy: existingEntry?.createdBy || input.createdBy || input.paidBy,
     createdAt: existingEntry?.createdAt || now,

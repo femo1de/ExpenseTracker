@@ -240,6 +240,7 @@ export function createLocalDemoStorage(homeCurrency = "SGD", userIds = ["partner
           splitMode: "even",
           splits: { [idA]: 2400, [idB]: 2400 },
           splitsHome: { [idA]: 21.12, [idB]: 21.12 },
+          tags: ["Japan 2026"],
           notes: "Sample multi-currency expense",
           createdBy: idA,
           createdAt: new Date(Date.now() - 3600000).toISOString(),
