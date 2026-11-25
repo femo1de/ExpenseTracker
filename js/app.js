@@ -1078,6 +1078,12 @@ function wireEvents() {
   });
 
   // Header controls
+  el("easter-egg-trigger").addEventListener("click", () => {
+    el("mermaid-overlay").classList.remove("hidden");
+  });
+  el("mermaid-overlay").addEventListener("click", () => {
+    el("mermaid-overlay").classList.add("hidden");
+  });
   el("refresh-btn").addEventListener("click", () => refreshLedger(true));
   el("logout-btn").addEventListener("click", signOut);
 
@@ -1135,6 +1141,7 @@ function wireEvents() {
     if (e.key === "Escape") {
       closeModal("expense-modal");
       closeModal("payback-modal");
+      el("mermaid-overlay").classList.add("hidden");
     }
   });
 
