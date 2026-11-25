@@ -411,6 +411,7 @@ select:focus {
   position: sticky;
   top: 0;
   z-index: 20;
+  padding-top: env(safe-area-inset-top);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -433,21 +434,32 @@ select:focus {
 }
 
 .topbar-icon-btn {
-  padding: 0;
+  position: relative;
+  z-index: 2;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px;
+  margin: -6px;
   border: none;
   background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   flex-shrink: 0;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+.topbar-icon-btn:active {
+  transform: scale(0.94);
 }
 
 .topbar-icon {
   border-radius: 8px;
   display: block;
+  pointer-events: none;
 }
 
 .topbar-title {
@@ -1076,19 +1088,26 @@ select:focus {
 /* Mermaid Easter Egg Overlay */
 .mermaid-overlay {
   position: fixed;
-  inset: 0;
-  z-index: 120;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
   background:
-    radial-gradient(circle at 50% 30%, rgba(244, 114, 182, 0.34) 0%, transparent 55%),
-    radial-gradient(circle at 20% 80%, rgba(236, 72, 153, 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 50% 30%, rgba(244, 114, 182, 0.36) 0%, transparent 55%),
+    radial-gradient(circle at 20% 80%, rgba(236, 72, 153, 0.28) 0%, transparent 50%),
     linear-gradient(165deg, #3b0722 0%, #5b1037 45%, #831843 85%, #4a0d2b 100%);
   cursor: pointer;
   overflow: hidden;
-  animation: mermaidFadeIn 0.32s ease-out;
+  touch-action: manipulation;
+  animation: mermaidFadeIn 0.28s ease-out;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1106,26 +1125,28 @@ select:focus {
 .mermaid-art {
   margin: 0;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: clamp(11px, 3.1vw, 18px);
+  font-size: clamp(12px, 3.6vw, 19px);
   line-height: 1.24;
   font-weight: 700;
   white-space: pre;
   text-align: left;
   user-select: none;
-  color: #ff85c0;
-  text-shadow: 0 0 12px rgba(255, 118, 194, 0.7), 0 0 26px rgba(244, 114, 182, 0.4);
+  color: #ff99d6;
+  text-shadow:
+    0 0 8px rgba(255, 133, 192, 0.9),
+    0 0 22px rgba(244, 114, 182, 0.65),
+    0 0 40px rgba(236, 72, 153, 0.4);
   animation: mermaidFloat 3.6s ease-in-out infinite;
 }
 
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .mermaid-art {
-    background: linear-gradient(180deg, #ffe4f3 0%, #ff9ad5 42%, #ff5cb3 78%, #f472b6 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: none;
-    filter: drop-shadow(0 0 12px rgba(255, 118, 194, 0.65)) drop-shadow(0 0 28px rgba(244, 114, 182, 0.35));
-  }
+.mermaid-art .m-star {
+  color: #ffe4f3;
+  text-shadow: 0 0 10px rgba(255, 228, 243, 0.95), 0 0 22px rgba(255, 154, 213, 0.75);
+}
+
+.mermaid-art .m-wave {
+  color: #f472b6;
+  text-shadow: 0 0 10px rgba(244, 114, 182, 0.85);
 }
 
 .mermaid-hint {

@@ -1078,12 +1078,34 @@ function wireEvents() {
   });
 
   // Header controls
-  el("easter-egg-trigger").addEventListener("click", () => {
-    el("mermaid-overlay").classList.remove("hidden");
-  });
-  el("mermaid-overlay").addEventListener("click", () => {
-    el("mermaid-overlay").classList.add("hidden");
-  });
+  const easterEggTrigger = el("easter-egg-trigger");
+  const mermaidOverlay = el("mermaid-overlay");
+  let mermaidOpenedAt = 0;
+
+  function openMermaidOverlay(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (!mermaidOverlay) return;
+    mermaidOpenedAt = Date.now();
+    mermaidOverlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeMermaidOverlay() {
+    if (!mermaidOverlay || mermaidOverlay.classList.contains("hidden")) return;
+    if (Date.now() - mermaidOpenedAt < 250) return;
+    mermaidOverlay.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+
+  if (easterEggTrigger) {
+    easterEggTrigger.addEventListener("click", openMermaidOverlay);
+  }
+  if (mermaidOverlay) {
+    mermaidOverlay.addEventListener("click", closeMermaidOverlay);
+  }
   el("refresh-btn").addEventListener("click", () => refreshLedger(true));
   el("logout-btn").addEventListener("click", signOut);
 
@@ -1141,7 +1163,10 @@ function wireEvents() {
     if (e.key === "Escape") {
       closeModal("expense-modal");
       closeModal("payback-modal");
-      el("mermaid-overlay").classList.add("hidden");
+      if (mermaidOverlay) {
+        mermaidOverlay.classList.add("hidden");
+        document.body.style.overflow = "";
+      }
     }
   });
 
