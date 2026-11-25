@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Trip Expenses</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <!-- LOGIN / UNLOCK VIEW -->
+      <main id="login-view" class="login-view hidden">
+        <div class="login-card">
+          <div class="login-brand">
+            <img src="./icon.svg" alt="" class="brand-icon" width="56" height="56" />
+            <h1 id="login-title">Trip Expenses</h1>
+            <p class="subtitle">Select your name and enter your password</p>
+          </div>
+
+          <div id="setup-notice" class="notice-banner hidden">
+            <strong>GitHub sync not configured yet.</strong>
+            <p>
+              Run <code>node scripts/setup-config.mjs</code> locally to set your names, passwords,
+              and encrypted GitHub token, or try Demo Mode right now.
+            </p>
+            <button type="button" id="demo-mode-btn" class="btn btn-secondary btn-full">
+              Open Demo Mode (Local Browser Storage)
+            </button>
+          </div>
+
+          <form id="login-form" class="form-stack" autocomplete="on">
+            <div class="field-group">
+              <label class="field-label">Who are you?</label>
+              <div id="login-user-picker" class="segmented-control" role="radiogroup" aria-label="Choose partner"></div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="login-password">Password</label>
+              <div class="password-wrap">
+                <input
+                  id="login-password"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="Enter your password"
+                  required
+                />
+                <button
+                  type="button"
+                  id="toggle-password-btn"
+                  class="icon-btn"
+                  aria-label="Show password"
+                  title="Show or hide password"
+                >
+                  Show
+                </button>
+              </div>
+            </div>
+
+            <label class="checkbox-row">
+              <input id="remember-me" type="checkbox" checked />
+              <span>Keep me signed in on this device</span>
+            </label>
+
+            <p id="login-error" class="form-error hidden" role="alert"></p>
+
+            <button type="submit" id="login-submit-btn" class="btn btn-primary btn-full">
+              Unlock Ledger
+            </button>
+          </form>
+        </div>
+      </main>
+
+      <!-- MAIN DASHBOARD VIEW -->
+      <div id="dashboard-view" class="dashboard-view hidden">
+        <header class="topbar">
+          <div class="topbar-inner">
+            <div class="topbar-left">
+              <img src="./icon.svg" alt="" class="topbar-icon" width="32" height="32" />
+              <div>
+                <h1 id="app-title" class="topbar-title">Trip Expenses</h1>
+                <div class="topbar-meta">
+                  <span id="current-user-pill" class="user-pill"></span>
+                  <span id="sync-status" class="sync-pill">Synced</span>
+                </div>
+              </div>
+            </div>
+            <div class="topbar-actions">
+              <button
+                type="button"
+                id="refresh-btn"
+                class="btn btn-ghost btn-sm"
+                title="Refresh from GitHub"
+                aria-label="Refresh expenses"
+              >
+                <span class="btn-icon" aria-hidden="true">↻</span>
+                <span class="hide-xs">Sync</span>
+              </button>
+              <button
+                type="button"
+                id="logout-btn"
+                class="btn btn-ghost btn-sm"
+                title="Switch user or sign out"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div class="dashboard-grid">
+          <!-- SUMMARY / BALANCE COLUMN -->
+          <aside class="summary-column">
+            <section class="balance-card" aria-live="polite">
+              <div class="balance-header">
+                <span class="balance-eyebrow">Running Balance</span>
+                <span id="home-currency-badge" class="currency-badge">SGD</span>
+              </div>
+
+              <div id="balance-headline" class="balance-headline">All settled up!</div>
+              <div id="balance-amount" class="balance-amount">S$0.00</div>
+              <p id="balance-subtext" class="balance-subtext"></p>
+
+              <div id="settle-cta-wrap" class="settle-cta-wrap hidden">
+                <button type="button" id="quick-settle-btn" class="btn btn-accent btn-full">
+                  Settle Up Now
+                </button>
+              </div>
+
+              <div class="stats-grid">
+                <div class="stat-box">
+                  <span class="stat-label">Total Spent</span>
+                  <strong id="stat-total-spent" class="stat-value">S$0.00</strong>
+                </div>
+                <div class="stat-box">
+                  <span id="stat-user-a-label" class="stat-label">Partner A Paid</span>
+                  <strong id="stat-user-a-paid" class="stat-value">S$0.00</strong>
+                </div>
+                <div class="stat-box">
+                  <span id="stat-user-b-label" class="stat-label">Partner B Paid</span>
+                  <strong id="stat-user-b-paid" class="stat-value">S$0.00</strong>
+                </div>
+              </div>
+
+              <div id="currency-breakdown-wrap" class="breakdown-wrap hidden">
+                <button
+                  type="button"
+                  id="toggle-breakdown-btn"
+                  class="breakdown-toggle"
+                  aria-expanded="true"
+                >
+                  <span>Balance by currency</span>
+                  <span id="breakdown-chevron" aria-hidden="true">▾</span>
+                </button>
+                <ul id="currency-breakdown-list" class="breakdown-list"></ul>
+              </div>
+            </section>
+
+            <!-- DESKTOP ACTION BUTTONS -->
+            <div class="desktop-actions">
+              <button type="button" id="desktop-add-expense-btn" class="btn btn-primary btn-lg btn-full">
+                + Add Expense
+              </button>
+              <button type="button" id="desktop-payback-btn" class="btn btn-secondary btn-lg btn-full">
+                ⇄ Pay Back
+              </button>
+            </div>
+          </aside>
+
+          <!-- ACTIVITY FEED COLUMN -->
+          <section class="feed-column">
+            <div class="feed-controls">
+              <input
+                id="search-input"
+                type="search"
+                class="search-input"
+                placeholder="Search expenses, notes, currency..."
+                aria-label="Search expenses"
+              />
+              <div class="filter-pills" role="tablist" aria-label="Filter entries">
+                <button type="button" class="filter-pill active" data-filter="all">All</button>
+                <button type="button" class="filter-pill" data-filter="expense">Expenses</button>
+                <button type="button" class="filter-pill" data-filter="settlement">Paybacks</button>
+              </div>
+            </div>
+
+            <div id="feed-container" class="feed-container"></div>
+          </section>
+        </div>
+
+        <!-- MOBILE STICKY ACTION BAR -->
+        <nav class="mobile-action-bar" aria-label="Primary actions">
+          <button type="button" id="mobile-add-expense-btn" class="btn btn-primary btn-lg">
+            + Add Expense
+          </button>
+          <button type="button" id="mobile-payback-btn" class="btn btn-secondary btn-lg">
+            ⇄ Pay Back
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- EXPENSE MODAL -->
+    <div id="expense-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h2 id="expense-modal-title">Add Expense</h2>
+          <button type="button" class="icon-btn modal-close" data-close-modal="expense-modal" aria-label="Close">✕</button>
+        </div>
+        <form id="expense-form" class="modal-body form-stack">
+          <input type="hidden" id="exp-id" />
+
+          <div class="field-group">
+            <label class="field-label" for="exp-title">Description</label>
+            <input id="exp-title" type="text" placeholder="e.g., Ramen dinner, Train tickets" required maxlength="120" />
+          </div>
+
+          <div class="field-row">
+            <div class="field-group flex-2">
+              <label class="field-label" for="exp-amount">Amount</label>
+              <input id="exp-amount" type="number" inputmode="decimal" step="any" min="0.001" placeholder="0.00" required />
+            </div>
+            <div class="field-group flex-1">
+              <label class="field-label" for="exp-currency">Currency</label>
+              <select id="exp-currency"></select>
+            </div>
+          </div>
+
+          <div id="exp-custom-currency-row" class="field-group hidden">
+            <label class="field-label" for="exp-custom-currency">3-letter ISO currency code</label>
+            <input id="exp-custom-currency" type="text" maxlength="3" placeholder="e.g., CHF" autocapitalize="characters" />
+          </div>
+
+          <div id="exp-fx-box" class="fx-box hidden">
+            <div class="fx-row">
+              <label class="field-label" for="exp-fx-rate">
+                Exchange rate (1 <span id="exp-fx-from">USD</span> → <span id="exp-fx-to">SGD</span>)
+              </label>
+              <button type="button" id="exp-fx-refresh" class="link-btn">Refresh rate</button>
+            </div>
+            <div class="fx-input-row">
+              <input id="exp-fx-rate" type="number" inputmode="decimal" step="any" min="0.000001" placeholder="1.0000" />
+              <span id="exp-home-preview" class="fx-preview">≈ S$0.00</span>
+            </div>
+            <small id="exp-fx-status" class="field-hint"></small>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group flex-1">
+              <label class="field-label" for="exp-date">Date</label>
+              <input id="exp-date" type="date" required />
+            </div>
+            <div class="field-group flex-1">
+              <label class="field-label">Paid by</label>
+              <div id="exp-paid-by" class="segmented-control compact"></div>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Split</label>
+            <div class="segmented-control compact" id="exp-split-mode">
+              <button type="button" class="seg-btn active" data-split-mode="even">Split evenly</button>
+              <button type="button" class="seg-btn" data-split-mode="sum">Split by sum</button>
+            </div>
+          </div>
+
+          <div id="exp-even-preview" class="split-preview"></div>
+
+          <div id="exp-custom-split-box" class="custom-split-box hidden">
+            <div class="quick-chips">
+              <button type="button" class="chip-btn" data-quick-split="even">50 / 50</button>
+              <button type="button" class="chip-btn" data-quick-split="allA" id="chip-all-a">All A</button>
+              <button type="button" class="chip-btn" data-quick-split="allB" id="chip-all-b">All B</button>
+            </div>
+            <div class="field-row">
+              <div class="field-group flex-1">
+                <label class="field-label" id="exp-split-a-label" for="exp-split-a">Partner A share</label>
+                <input id="exp-split-a" type="number" inputmode="decimal" step="any" min="0" placeholder="0.00" />
+              </div>
+              <div class="field-group flex-1">
+                <label class="field-label" id="exp-split-b-label" for="exp-split-b">Partner B share</label>
+                <input id="exp-split-b" type="number" inputmode="decimal" step="any" min="0" placeholder="0.00" />
+              </div>
+            </div>
+            <small id="exp-split-status" class="field-hint"></small>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="exp-notes">Notes (optional)</label>
+            <input id="exp-notes" type="text" placeholder="Optional note" maxlength="200" />
+          </div>
+
+          <p id="exp-error" class="form-error hidden" role="alert"></p>
+
+          <div class="modal-footer">
+            <button type="button" id="exp-delete-btn" class="btn btn-danger hidden">Delete</button>
+            <div class="modal-footer-right">
+              <button type="button" class="btn btn-ghost" data-close-modal="expense-modal">Cancel</button>
+              <button type="submit" id="exp-save-btn" class="btn btn-primary">Save Expense</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- PAY BACK / SETTLEMENT MODAL -->
+    <div id="payback-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="payback-modal-title">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h2 id="payback-modal-title">Record Payback</h2>
+          <button type="button" class="icon-btn modal-close" data-close-modal="payback-modal" aria-label="Close">✕</button>
+        </div>
+        <form id="payback-form" class="modal-body form-stack">
+          <input type="hidden" id="pay-id" />
+
+          <div class="field-group">
+            <label class="field-label">Payment direction</label>
+            <div id="pay-direction" class="segmented-control"></div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group flex-2">
+              <label class="field-label" for="pay-amount">Amount</label>
+              <input id="pay-amount" type="number" inputmode="decimal" step="any" min="0.001" placeholder="0.00" required />
+            </div>
+            <div class="field-group flex-1">
+              <label class="field-label" for="pay-currency">Currency</label>
+              <select id="pay-currency"></select>
+            </div>
+          </div>
+
+          <div id="pay-custom-currency-row" class="field-group hidden">
+            <label class="field-label" for="pay-custom-currency">3-letter ISO currency code</label>
+            <input id="pay-custom-currency" type="text" maxlength="3" placeholder="e.g., EUR" autocapitalize="characters" />
+          </div>
+
+          <div id="pay-fx-box" class="fx-box hidden">
+            <div class="fx-row">
+              <label class="field-label" for="pay-fx-rate">
+                Exchange rate (1 <span id="pay-fx-from">USD</span> → <span id="pay-fx-to">SGD</span>)
+              </label>
+              <button type="button" id="pay-fx-refresh" class="link-btn">Refresh rate</button>
+            </div>
+            <div class="fx-input-row">
+              <input id="pay-fx-rate" type="number" inputmode="decimal" step="any" min="0.000001" placeholder="1.0000" />
+              <span id="pay-home-preview" class="fx-preview">≈ S$0.00</span>
+            </div>
+            <small id="pay-fx-status" class="field-hint"></small>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group flex-1">
+              <label class="field-label" for="pay-date">Date</label>
+              <input id="pay-date" type="date" required />
+            </div>
+            <div class="field-group flex-1">
+              <label class="field-label" for="pay-title">Method / Label</label>
+              <input id="pay-title" type="text" placeholder="e.g., PayNow, Cash" maxlength="100" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="pay-notes">Notes (optional)</label>
+            <input id="pay-notes" type="text" placeholder="Optional note" maxlength="200" />
+          </div>
+
+          <p id="pay-error" class="form-error hidden" role="alert"></p>
+
+          <div class="modal-footer">
+            <button type="button" id="pay-delete-btn" class="btn btn-danger hidden">Delete</button>
+            <div class="modal-footer-right">
+              <button type="button" class="btn btn-ghost" data-close-modal="payback-modal">Cancel</button>
+              <button type="submit" id="pay-save-btn" class="btn btn-primary">Save Payback</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>

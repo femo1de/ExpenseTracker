@@ -1,0 +1,235 @@
+#!/usr/bin/env node
+// Interactive setup script to generate config.js with password-encrypted Fine-Grained PAT blobs.
+// Zero external dependencies — requires Node.js 20+.
+
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import readline from "node:readline";
+import { encryptToken } from "../js/crypto.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CONFIG_PATH = path.resolve(__dirname, "..", "config.js");
+
+function askQuestion(rl, promptText, defaultValue = "") {
+  const suffix = defaultValue ? ` [${defaultValue}]` : "";
+  return new Promise((resolve) => {
+    rl.question(`${promptText}${suffix}: `, (answer) => {
+      resolve(answer.trim() || defaultValue);
+    });
+  });
+}
+
+function askSecret(promptText) {
+  return new Promise((resolve, reject) => {
+    const stdin = process.stdin;
+    const stdout = process.stdout;
+
+    if (!stdin.isTTY) {
+      const rl = readline.createInterface({ input: stdin, output: stdout });
+      rl.question(`${promptText}: `, (answer) => {
+        rl.close();
+        resolve(answer.trim());
+      });
+      return;
+    }
+
+    stdout.write(`${promptText}: `);
+    let value = "";
+    const wasRaw = stdin.isRaw;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+
+    function onData(chunk) {
+      // Strip bracketed-paste markers sent by modern terminals (xterm.js, Windows Terminal)
+      const cleaned = chunk.replace(/\u001b\[200~/g, "").replace(/\u001b\[201~/g, "");
+      if (!cleaned) return;
+
+      // Single keypress handling
+      if (cleaned === "\u0003") {
+        cleanup();
+        stdout.write("\n");
+        reject(new Error("Setup cancelled."));
+        return;
+      }
+      if (cleaned === "\r" || cleaned === "\n" || cleaned === "\r\n") {
+        cleanup();
+        stdout.write("\n");
+        resolve(value.trim());
+        return;
+      }
+      if (cleaned === "\u007f" || cleaned === "\b") {
+        if (value.length > 0) {
+          value = value.slice(0, -1);
+          stdout.write("\b \b");
+        }
+        return;
+      }
+
+      // Multi-character paste or printable character(s)
+      const isPaste = cleaned.length > 1;
+      for (const ch of cleaned) {
+        if (ch === "\u0003") {
+          cleanup();
+          stdout.write("\n");
+          reject(new Error("Setup cancelled."));
+          return;
+        }
+        if (ch === "\r" || ch === "\n") {
+          // Ignore newlines inside pasted text so the user sees the stars and presses Enter to confirm
+          if (!isPaste) {
+            cleanup();
+            stdout.write("\n");
+            resolve(value.trim());
+            return;
+          }
+          continue;
+        }
+        if (ch === "\u007f" || ch === "\b") {
+          if (value.length > 0) {
+            value = value.slice(0, -1);
+            stdout.write("\b \b");
+          }
+          continue;
+        }
+        // Ignore non-printable control chars (e.g. raw Ctrl+V = \u0016)
+        if (ch.charCodeAt(0) < 32) continue;
+        value += ch;
+        stdout.write("*");
+      }
+    }
+
+    function cleanup() {
+      stdin.removeListener("data", onData);
+      stdin.setRawMode(Boolean(wasRaw));
+      stdin.pause();
+    }
+
+    stdin.on("data", onData);
+  });
+}
+
+async function askRequiredSecret(promptText) {
+  while (true) {
+    const val = await askSecret(promptText);
+    if (val) return val;
+    console.log("  (Cannot be empty - please type or paste the value, then press Enter.)");
+  }
+}
+
+export async function buildConfigFileContent({
+  appName = "Trip Expenses",
+  homeCurrency = "SGD",
+  owner = "femo1de",
+  repo = "ExpenseTracker",
+  branch = "data",
+  filePath = "expenses.json",
+  partnerAName,
+  partnerAPassword,
+  partnerBName,
+  partnerBPassword,
+  githubToken,
+}) {
+  if (!partnerAName || !partnerBName) {
+    throw new Error("Both partner names are required.");
+  }
+  if (!partnerAPassword || !partnerBPassword) {
+    throw new Error("Both partner passwords are required.");
+  }
+  if (!githubToken) {
+    throw new Error("GitHub Fine-Grained PAT is required.");
+  }
+
+  const normalizedCurrency = String(homeCurrency || "SGD").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
+    throw new Error("Home currency must be a 3-letter ISO code (e.g., SGD).");
+  }
+
+  const [encA, encB] = await Promise.all([
+    encryptToken(githubToken, partnerAPassword),
+    encryptToken(githubToken, partnerBPassword),
+  ]);
+
+  const configObj = {
+    appName,
+    homeCurrency: normalizedCurrency,
+    github: {
+      owner,
+      repo,
+      branch,
+      filePath,
+    },
+    users: [
+      {
+        id: "partnerA",
+        name: partnerAName,
+        ...encA,
+      },
+      {
+        id: "partnerB",
+        name: partnerBName,
+        ...encB,
+      },
+    ],
+  };
+
+  return (
+    `// Generated by scripts/setup-config.mjs\n` +
+    `// Contains password-encrypted GitHub token blobs (PBKDF2-SHA256 + AES-256-GCM).\n` +
+    `// No plaintext passwords or tokens are stored here.\n\n` +
+    `export const CONFIG = ${JSON.stringify(configObj, null, 2)};\n`
+  );
+}
+
+async function runCli() {
+  console.log("\n=== Trip Expenses Config Setup ===\n");
+  console.log("This encrypts your single-repo Fine-Grained GitHub PAT separately with each");
+  console.log("partner's password and writes config.js (no plaintext secrets are saved).\n");
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+  try {
+    const appName = await askQuestion(rl, "App title", "Trip Expenses");
+    const homeCurrency = (await askQuestion(rl, "Home currency (3-letter ISO)", "SGD")).toUpperCase();
+    const owner = await askQuestion(rl, "GitHub username / owner", "femo1de");
+    const repo = await askQuestion(rl, "Data repository name (private repo recommended)", "ExpenseTracker-data");
+    const branch = await askQuestion(rl, "Data branch name", "data");
+    const filePath = await askQuestion(rl, "JSON file path", "expenses.json");
+    const partnerAName = await askQuestion(rl, "Partner 1 name", "Partner A");
+    const partnerBName = await askQuestion(rl, "Partner 2 name", "Partner B");
+    rl.close();
+
+    const partnerAPassword = await askRequiredSecret(`Password for ${partnerAName}`);
+    const partnerBPassword = await askRequiredSecret(`Password for ${partnerBName}`);
+    const githubToken = await askRequiredSecret("GitHub Fine-Grained PAT (Contents: Read & Write)");
+
+    const content = await buildConfigFileContent({
+      appName,
+      homeCurrency,
+      owner,
+      repo,
+      branch,
+      filePath,
+      partnerAName,
+      partnerAPassword,
+      partnerBName,
+      partnerBPassword,
+      githubToken,
+    });
+
+    await writeFile(CONFIG_PATH, content, "utf8");
+    console.log(`\n✓ Wrote encrypted configuration to ${CONFIG_PATH}`);
+    console.log("Next steps:");
+    console.log("  1. git add config.js && git commit -m \"Configure encrypted access\"");
+    console.log("  2. git push origin main\n");
+  } catch (err) {
+    rl.close();
+    console.error(`\nError: ${err.message}`);
+    process.exitCode = 1;
+  }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  runCli();
+}
